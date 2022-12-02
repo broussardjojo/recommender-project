@@ -1,6 +1,7 @@
 import asyncio
 import pathlib
 from typing import List, Optional
+from urllib.parse import urlencode
 
 import pandas as pd
 import requests
@@ -10,12 +11,14 @@ from aiohttp import ClientSession
 import base64
 import api_setup
 import encoding
+import webbrowser
 
 env_vars = api_setup.parse_api_kvs("../api-keys")
 EXPECTED_COLUMN_ORDER = ['track_id', 'artist_name', 'track_name', 'duration_ms', 'danceability', 'energy', 'key',
                          'loudness', 'mode', 'speechiness', 'acousticness', 'instrumentalness', 'liveness', 'valence',
                          'tempo', 'time_signature', 'genres', 'artist_popularity']
 REPO_ROOT = pathlib.Path.cwd().parent
+
 
 def auth_args():
     env_vars = api_setup.parse_api_kvs(REPO_ROOT / "api-keys")
@@ -27,18 +30,37 @@ def auth_args():
 
 def oauth_args(scope: List[str] = ['playlist-modify-public', 'playlist-modify-private']):
     env_vars = api_setup.parse_api_kvs(REPO_ROOT / "api-keys")
-    oauth_manager = spotipy.oauth2.SpotifyPKCE(
-        env_vars['client_id'], 'https://localhost:8888/callback', scope=scope)
-    return oauth_manager
+    oauth_manager = spotipy.oauth2.SpotifyOAuth(
+        client_id=env_vars['client_id'],
+        client_secret=env_vars['client_secret'],
+        redirect_uri='https://localhost:8888/callback', scope=scope)
+    return oauth_manager.get_access_token()
+
 
 def get_header_with_oauth_token(token: str):
     return {"Accept": "application/json", "Content-Type": "application/json", "Authorization": f"Bearer {token}"
             }
 
+
 def get_token(client_id: str, client_secret: str, redirect_uri: str, scope: List[str]):
-    auth_endpoint = "https://accounts.spotify.com/api/token"
-    token = requests.get(auth_endpoint, data={'client_id': client_id, 'client_secret': client_secret, 'redirect_uri': redirect_uri, 'scope': " ".join(scope)})
+    auth_endpoint = "https://accounts.spotify.com/authorize"
+    auth_headers = {
+        "response_type": "code",
+        "client_id": client_id,
+        "scope": " ".join(scope),
+        "redirect_uri": redirect_uri
+    }
+    token = requests.get(auth_endpoint, headers=auth_headers)
+    #webbrowser.open("https://accounts.spotify.com/authorize?" + urlencode(auth_headers))
+
+    # message = base64.b64encode(f"{client_id}:{client_secret}".encode('ascii')).decode('ascii')
+    # #token = requests.get(auth_endpoint,
+    #                      data={
+    #                          'grant_type': 'authorization_code',
+    #                      },
+    #                      headers={'message':message})
     return token
+
 
 def get_songs_from_playlist(spotify_client: spotipy.Spotify, playlist_uri: str) -> List[str]:
     """
@@ -141,7 +163,9 @@ async def dataframe_from_playlist(spotify_client: spotipy.Spotify, client_id: st
 
     return song_features_df
 
-async def get_playlist_vector_from_uri(spotify_client: spotipy.Spotify, client_id: str, client_secret: str, playlist_uri: str, scalers_and_encoders: Optional[dict] = None) -> pd.DataFrame:
+
+async def get_playlist_vector_from_uri(spotify_client: spotipy.Spotify, client_id: str, client_secret: str,
+                                       playlist_uri: str, scalers_and_encoders: Optional[dict] = None) -> pd.DataFrame:
     playlist_features = await dataframe_from_playlist(spotify_client, client_id, client_secret, playlist_uri)
     if not scalers_and_encoders:
         scalers_and_encoders = encoding.fit_scalers_and_encoders(playlist_features)
@@ -152,3 +176,6 @@ async def get_playlist_vector_from_uri(spotify_client: spotipy.Spotify, client_i
     playlist_feature_vector = playlist_features.sum(axis=0, numeric_only=False)
     return playlist_feature_vector
 
+
+if __name__ == '__main__':
+    print(get_token(env_vars['client_id'], env_vars['client_secret'], env_vars['redirect_uri'], ['playlist-modify-public', 'playlist-modify-private']).content)

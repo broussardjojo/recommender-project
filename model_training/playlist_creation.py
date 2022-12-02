@@ -59,12 +59,11 @@ async def create_playlist(oauth_token: str, playlist_name: str, track_uris: List
         async with session.post(create_playlist_endpoint, json=create_playlist_data) as response:
             playlist_id = await response.read()
             playlist_id = playlist_id.decode()
-            print(playlist_id)
             playlist_id = json.loads(playlist_id, strict=False)
         playlist_id = playlist_id['id']
 
         # Add tracks to playlist
         add_songs_to_playlist_endpoint = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
         resp = await session.post(add_songs_to_playlist_endpoint, json={'uris': ['spotify:track:' + uri for uri in track_uris_as_sublists[0]]})
-        print(resp)
+        pp.pprint(resp)
 
