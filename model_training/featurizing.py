@@ -7,7 +7,7 @@ import pandas as pd
 import requests
 import spotipy
 import spotipy.oauth2
-from aiohttp import ClientSession
+from aiohttp import ClientSession, ContentTypeError
 import base64
 import api_setup
 import encoding
@@ -94,7 +94,8 @@ async def get_artist(session: ClientSession, artist_uri: str) -> dict:
 
     return response
 
-
+def sync_get_artist_from_track_uri(spotify: spotipy.Spotify, track_uri: str) -> dict:
+    spotify.track
 async def get_artist_from_track_uri(session: ClientSession, track_uri: str) -> dict:
     """
     Given a track URI, return its artist's name and their popularity.
@@ -103,14 +104,17 @@ async def get_artist_from_track_uri(session: ClientSession, track_uri: str) -> d
     endpoint = f"https://api.spotify.com/v1/tracks/{uri}"
 
     async with session.get(endpoint) as response:
-        response = await(response.json())
-        track_name = response['name']
-        artist_uri = response['artists'][0]['uri']
-        artist_info = await(get_artist(session, artist_uri))
-    artist_name, artist_popularity, artist_genres = artist_info['name'], artist_info['popularity'], artist_info[
-        'genres']
-    return {'track_uri': uri, 'artist_name': artist_name, 'artist_popularity': artist_popularity,
-            'artist_genres': artist_genres, 'track_name': track_name}
+        try:
+            response_json = await(response.json(content_type=None))
+            track_name = response_json['name']
+            artist_uri = response_json['artists'][0]['uri']
+            artist_info = await(get_artist(session, artist_uri))
+            artist_name, artist_popularity, artist_genres = artist_info['name'], artist_info['popularity'], artist_info[
+                'genres']
+            return {'track_uri': uri, 'artist_name': artist_name, 'artist_popularity': artist_popularity,
+                    'artist_genres': artist_genres, 'track_name': track_name}
+        except ContentTypeError:
+            print(response)
 
 
 def get_header_with_token(client_id: str, client_secret: str):
@@ -175,6 +179,9 @@ async def get_playlist_vector_from_uri(spotify_client: spotipy.Spotify, client_i
     playlist_features = playlist_features.drop(columns=[*encoding.UNUSED_COLUMNS, 'track_id'])
     playlist_feature_vector = playlist_features.sum(axis=0, numeric_only=False)
     return playlist_feature_vector
+
+def sync_get_playlist_vector_from_uri(spotify_client: spotipy.Spotify, client_id: str, client_secret: str,
+                                       playlist_uri: str, scalers_and_encoders: Optional[dict] = None) -> pd.DataFrame:
 
 
 if __name__ == '__main__':
