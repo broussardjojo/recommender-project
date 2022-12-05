@@ -180,9 +180,6 @@ async def get_playlist_vector_from_uri(spotify_client: spotipy.Spotify, client_i
     playlist_feature_vector = playlist_features.sum(axis=0, numeric_only=False)
     return playlist_feature_vector
 
-def sync_get_playlist_vector_from_uri(spotify_client: spotipy.Spotify, client_id: str, client_secret: str,
-                                       playlist_uri: str, scalers_and_encoders: Optional[dict] = None) -> pd.DataFrame:
-
 
 if __name__ == '__main__':
     print(get_token(env_vars['client_id'], env_vars['client_secret'], env_vars['redirect_uri'], ['playlist-modify-public', 'playlist-modify-private']).content)
